@@ -17,24 +17,26 @@ allprojects {
 
 subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
+    apply(plugin = "java")
 
     dependencies {
-        "implementation"(libs.kotlinx.coroutines.core)
-        "implementation"(libs.kotlinx.serialization.json)
-        "testImplementation"(libs.junit.jupiter)
-        "testImplementation"(libs.mockk)
-        "testImplementation"(libs.kotlinx.coroutines.test)
-        "testImplementation"(libs.turbine)
+        "implementation"("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+        "implementation"("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+        "testImplementation"("org.junit.jupiter:junit-jupiter:5.11.3")
+        "testImplementation"("org.junit.jupiter:junit-jupiter-engine:5.11.3")
+        "testImplementation"("io.mockk:mockk:1.13.13")
+        "testImplementation"("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+        "testImplementation"("app.cash.turbine:turbine:1.2.0")
     }
 
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-        kotlinOptions {
-            jvmTarget = "17"
-            freeCompilerArgs = listOf("-Xjsr305=strict")
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+            freeCompilerArgs.add("-Xjsr305=strict")
         }
     }
 
-    java {
+    extensions.configure<JavaPluginExtension> {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
