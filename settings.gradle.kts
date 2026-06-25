@@ -1,16 +1,21 @@
 pluginManagement {
     repositories {
-        gradlePluginPortal()
+        google()
         mavenCentral()
+        gradlePluginPortal()
     }
 }
 
 dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        google()
         mavenCentral()
     }
 }
 
 rootProject.name = "nyx-phone-agent"
 
-include(":backend")
+include(":agent-core")
+include(":agent-app")
+include(":skills")
