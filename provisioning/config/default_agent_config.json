@@ -1,0 +1,29 @@
+{
+  "version": "1.0",
+  "persona": {
+    "name": "Nyx",
+    "greeting": "Hello, you've reached Nyx. How can I help you today?",
+    "voice_id": "default",
+    "language": "en-US"
+  },
+  "llm": {
+    "backend": "mediapipe",
+    "model_asset": "gemma3-2b-it-q4.task",
+    "max_tokens": 256,
+    "temperature": 0.7
+  },
+  "voice": {
+    "stt_timeout_ms": 10000,
+    "tts_rate": 1.0,
+    "tts_pitch": 1.0,
+    "wake_word": "hey nyx"
+  },
+  "features": {
+    "call_intercept": true,
+    "sms_enabled": false,
+    "system_controls": false,
+    "background_loop": true
+  },
+  "license_key": "",
+  "device_uuid": ""
+}
