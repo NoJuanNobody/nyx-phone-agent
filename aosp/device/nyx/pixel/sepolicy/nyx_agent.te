@@ -1,0 +1,18 @@
+# SELinux type enforcement policy for NyxAgent privileged system app.
+
+type nyx_agent, domain;
+type nyx_agent_exec, exec_type, file_type;
+
+# Allow NyxAgent to run as a privileged app domain
+app_domain(nyx_agent)
+priv_app_domain(nyx_agent)
+
+# Telephony access
+allow nyx_agent radio_service:service_manager find;
+allow nyx_agent rild:unix_stream_socket connectto;
+
+# Audio access
+allow nyx_agent audio_device:chr_file rw_file_perms;
+
+# Network access
+allow nyx_agent self:tcp_socket create_stream_socket_perms;
