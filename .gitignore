@@ -1,0 +1,14 @@
+# Swarm worktrees — never stage these as embedded repos
+.claude/worktrees/
+
+# Dependencies / build
+node_modules/
+dist/
+build/
+out/
+*.log
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
