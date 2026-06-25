@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Privileged app permission allowlist for NyxAgent.
+     Grants all permissions required for the on-device phone agent.
+     Placed at /system/etc/permissions/ during the ROM build. -->
+<permissions>
+    <privapp-permissions package="com.nyx.agent">
+        <permission name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"/>
+        <permission name="android.permission.CALL_PHONE"/>
+        <permission name="android.permission.READ_CALL_LOG"/>
+        <permission name="android.permission.WRITE_CALL_LOG"/>
+        <permission name="android.permission.READ_CONTACTS"/>
+        <permission name="android.permission.WRITE_CONTACTS"/>
+        <permission name="android.permission.READ_SMS"/>
+        <permission name="android.permission.SEND_SMS"/>
+        <permission name="android.permission.RECORD_AUDIO"/>
+        <permission name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+        <permission name="android.permission.CHANGE_WIFI_STATE"/>
+        <permission name="android.permission.BLUETOOTH_CONNECT"/>
+        <permission name="android.permission.WRITE_SETTINGS"/>
+        <permission name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+        <permission name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+        <permission name="android.permission.FOREGROUND_SERVICE"/>
+    </privapp-permissions>
+</permissions>

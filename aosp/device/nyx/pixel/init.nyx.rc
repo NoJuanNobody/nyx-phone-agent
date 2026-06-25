@@ -1,0 +1,6 @@
+# init.nyx.rc — starts NyxAgentDaemon at boot
+service nyx_agent /system/bin/app_process /system/app/NyxAgent com.nyx.agent.daemon.NyxAgentDaemon
+    class main
+    user system
+    group system radio inet
+    oneshot
