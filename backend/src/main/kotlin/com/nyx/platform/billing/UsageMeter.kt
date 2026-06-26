@@ -20,7 +20,7 @@ class UsageMeter(private val planLimits: Map<String, Int> = DEFAULT_PLAN_LIMITS)
         val total = counter.addAndGet(durationSeconds)
         val limitMinutes = planLimits[planId] ?: DEFAULT_PLAN_LIMITS["starter"]!!
         val usedMinutes = total / 60
-        return if (usedMinutes <= limitMinutes) UsageResult.Allowed(total)
+        return if (limitMinutes == Int.MAX_VALUE || usedMinutes <= limitMinutes) UsageResult.Allowed(total)
                else UsageResult.LimitExceeded(limitMinutes, usedMinutes)
     }
 
