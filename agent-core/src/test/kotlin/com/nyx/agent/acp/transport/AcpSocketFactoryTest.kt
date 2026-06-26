@@ -35,7 +35,7 @@ class AcpSocketFactoryTest {
     }
 
     @Test
-    fun `resolve without /data/nyx falls back to abstract on non-rooted system`() {
+    fun `resolve without data-nyx path falls back to abstract on non-rooted system`() {
         // On macOS/dev machines, /data/nyx doesn't exist, so we get abstract.
         val config = AcpSocketConfig()
         val addr = AcpSocketFactory.resolve(config)

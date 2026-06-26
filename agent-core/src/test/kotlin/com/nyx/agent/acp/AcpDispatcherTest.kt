@@ -1,6 +1,7 @@
 package com.nyx.agent.acp
 
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -15,7 +16,7 @@ import org.junit.jupiter.api.Test
 class AcpDispatcherTest {
 
     private fun cmd(type: String, caller: String = "llm", reqId: String = "r1", params: Map<String, JsonPrimitive> = emptyMap()): AcpCommand =
-        AcpCommand(type, caller, reqId, buildJsonObject { params.forEach { (k, v) -> put(k, v) } })
+        AcpCommand(type, caller, buildJsonObject { params.forEach { (k, v) -> put(k, v) } }, reqId)
 
     @Test
     fun `validator rejects blank type`() {
@@ -29,7 +30,7 @@ class AcpDispatcherTest {
         val v = AcpCommandValidator()
         val r = v.validate(cmd("bogus.action"))
         assertNotNull(r)
-        assertEquals(DispatchOutcome.FAILURE, r.outcome)
+        assertEquals(DispatchOutcome.FAILURE, r!!.outcome)
     }
 
     @Test
@@ -67,7 +68,7 @@ class AcpDispatcherTest {
         assertEquals("sms.send", entry.commandType)
         assertEquals(DispatchOutcome.SUCCESS, entry.outcome)
         // PII redacted
-        assertEquals("***REDACTED***", entry.redactedParams["to"]!!.jsonPrimitive().content)
+        assertEquals("***REDACTED***", entry.redactedParams["to"]!!.jsonPrimitive.content)
     }
 
     @Test
@@ -107,7 +108,7 @@ class AcpDispatcherTest {
                 put("limit", 5)
             }
         )
-        assertEquals("***REDACTED***", redacted["to"]!!.jsonPrimitive().content)
-        assertEquals("5", redacted["limit"]!!.jsonPrimitive().content)
+        assertEquals("***REDACTED***", redacted["to"]!!.jsonPrimitive.content)
+        assertEquals("5", redacted["limit"]!!.jsonPrimitive.content)
     }
 }

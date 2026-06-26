@@ -353,7 +353,7 @@ class AcpServerTest {
             clientThread.start()
 
             // Give the request time to start
-            delay(50)
+            Thread.sleep(50)
 
             // Shutdown
             runBlocking {
