@@ -6,7 +6,9 @@ import com.nyx.agent.mcp.ToolDescriptor
 import com.nyx.agent.mcp.ToolExecutor
 import com.nyx.agent.mcp.ToolParam
 import com.nyx.agent.mcp.ToolRisk
+import com.nyx.agent.mcp.ToolResult
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -34,7 +36,7 @@ class IntentBridgeTest {
         val tc = LlmOutputParser.extractFirstToolCall(raw)
         assertNotNull(tc)
         assertEquals("telephony.answer", tc!!.name)
-        assertEquals("c1", tc.arguments["call_id"]!!.jsonPrimitive().content)
+        assertEquals("c1", tc.arguments["call_id"]!!.jsonPrimitive.content)
     }
 
     @Test
@@ -100,7 +102,7 @@ class IntentBridgeTest {
         val bridge = IntentBridge(registry())
         val out = bridge.process("""{"name":"telephony.answer","arguments":{"call_id":"c1"}}""")
         assertTrue(out is IntentBridge.Outcome.Ready)
-        assertEquals("c1", (out as IntentBridge.Outcome.Ready).call.arguments["call_id"]!!.jsonPrimitive().content)
+        assertEquals("c1", (out as IntentBridge.Outcome.Ready).call.arguments["call_id"]!!.jsonPrimitive.content)
     }
 
     @Test
@@ -113,7 +115,7 @@ class IntentBridgeTest {
     fun `retry policy exhausts and escalates`() {
         val policy = IntentRetryPolicy(maxRetries = 2)
         val attempts = mutableListOf<Int>()
-        val res = policy.runWithRetry({ attempt -> attempts.add(attempt) }) { Result.failure<Int>(RuntimeException("bad")) }
+        val res = policy.runWithRetry({ attempt, _ -> attempts.add(attempt) }) { Result.failure<Int>(RuntimeException("bad")) }
         assertTrue(res.isFailure)
         assertEquals(listOf(1, 2), attempts)
         assertTrue(res.exceptionOrNull()!!.message!!.contains("escalating to human"))

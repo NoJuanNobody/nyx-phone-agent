@@ -64,7 +64,7 @@ class McpExecutor(
             val acpResult = if (result.ok) AcpResult.success(mapOf("tool" to JsonPrimitive(call.name)))
                             else AcpResult.failure(com.nyx.agent.acp.schema.ErrorCode.INTERNAL, result.error ?: "tool failed")
             // Build an ACP command for audit purposes
-            val cmd = AcpCommand(call.name, "mcp", "tool-${call.name.hashCode()}", call.arguments)
+            val cmd = AcpCommand(call.name, "mcp", call.arguments, "tool-${call.name.hashCode()}")
             // Audit is done inside dispatch, but here we already executed; log directly via a no-op.
             // We rely on the tool executor itself routing through ACP. The audit entry below is
             // a secondary tool-execution audit record.

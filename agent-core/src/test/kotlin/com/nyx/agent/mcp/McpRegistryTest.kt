@@ -2,6 +2,7 @@ package com.nyx.agent.mcp
 
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.coroutines.delay
@@ -85,7 +86,7 @@ class McpRegistryTest {
     fun `executor runs end to end`() = runBlocking {
         val registry = McpRegistry()
         registry.register(pingTool(), ToolExecutor { call ->
-            val msg = call.arguments["msg"]!!.jsonPrimitive().content
+            val msg = call.arguments["msg"]!!.jsonPrimitive.content
             ToolResult(true, buildJsonObject { put("echo", msg) })
         })
         val store = com.nyx.agent.policy.InMemoryPolicyStore()
@@ -93,7 +94,7 @@ class McpRegistryTest {
         val exec = McpExecutor(policy, registry, McpToolSandbox())
         val r = exec.execute(ToolCall("system.ping", buildJsonObject { put("msg", "hello") }))
         assertTrue(r.ok)
-        assertEquals("hello", r.output["echo"]!!.jsonPrimitive().content)
+        assertEquals("hello", r.output["echo"]!!.jsonPrimitive.content)
     }
 
     @Test

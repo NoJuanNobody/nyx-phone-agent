@@ -22,6 +22,7 @@ object RiskClassifier {
         "contacts.read" to RiskTier.LOW,
         "notifications.read" to RiskTier.LOW,
         "system.query" to RiskTier.LOW,
+        "system.ping" to RiskTier.LOW,
         "ui.screenshot" to RiskTier.LOW,
         "voice.stt" to RiskTier.LOW,
         // MEDIUM — reversible side effects
