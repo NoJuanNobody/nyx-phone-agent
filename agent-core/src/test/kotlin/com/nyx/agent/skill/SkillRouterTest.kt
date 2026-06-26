@@ -6,18 +6,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
-import org.junit.Before
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 
 class SkillRouterTest {
 
     private lateinit var registry: SkillRegistry
     private lateinit var router: SkillRouter
 
-    @Before
+    @BeforeEach
     fun setUp() {
         registry = SkillRegistry()
         router = SkillRouter(registry)
@@ -47,7 +47,7 @@ class SkillRouterTest {
 
         val result = router.dispatch("launch_app", mapOf("package" to "com.example"))
 
-        assertTrue("Expected Success but got $result", result is SkillResult.Success)
+        assertTrue(result is SkillResult.Success, "Expected Success but got $result")
         assertEquals(mapOf("launched" to true), (result as SkillResult.Success).output)
     }
 
@@ -55,7 +55,7 @@ class SkillRouterTest {
     fun `dispatch to unknown skill returns SkillNotFound`() = runBlocking {
         val result = router.dispatch("nonexistent_skill", emptyMap())
 
-        assertTrue("Expected SkillNotFound but got $result", result is SkillResult.SkillNotFound)
+        assertTrue(result is SkillResult.SkillNotFound, "Expected SkillNotFound but got $result")
         assertEquals("nonexistent_skill", (result as SkillResult.SkillNotFound).skillName)
     }
 
@@ -70,7 +70,7 @@ class SkillRouterTest {
 
         val result = router.dispatch("bad_skill", emptyMap())
 
-        assertTrue("Expected Failure but got $result", result is SkillResult.Failure)
+        assertTrue(result is SkillResult.Failure, "Expected Failure but got $result")
         val failure = result as SkillResult.Failure
         assertNotNull(failure.cause)
         assertTrue(failure.error.contains("bad_skill"))
@@ -95,8 +95,8 @@ class SkillRouterTest {
         // Every result must be a Success — no SkillNotFound or Failure.
         results.forEachIndexed { i, result ->
             assertTrue(
-                "Expected Success for skill_$i but got $result",
                 result is SkillResult.Success,
+                "Expected Success for skill_$i but got $result",
             )
         }
         // All 10 skills are still registered after concurrent access.

@@ -25,6 +25,7 @@ subprojects {
         "implementation"("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
         "testImplementation"("org.junit.jupiter:junit-jupiter:5.11.3")
         "testImplementation"("org.junit.jupiter:junit-jupiter-engine:5.11.3")
+        "testImplementation"("org.jetbrains.kotlin:kotlin-test-junit5:2.0.21")
         "testImplementation"("io.mockk:mockk:1.13.13")
         "testImplementation"("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
         "testImplementation"("app.cash.turbine:turbine:1.2.0")
