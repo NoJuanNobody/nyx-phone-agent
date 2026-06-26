@@ -7,7 +7,7 @@ plugins {
 
 // Modules that target Android (apply the Android Gradle Plugin in their own
 // build.gradle.kts). They are excluded from the pure-JVM configuration below.
-val androidModules = setOf("agent-app")
+val androidModules = setOf("agent-app", "skills")
 
 allprojects {
     group = "com.nyx"

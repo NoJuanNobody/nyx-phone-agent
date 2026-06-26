@@ -16,6 +16,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * Unit tests for [LaunchAppSkill].
@@ -25,6 +28,8 @@ import org.junit.Test
  * - `com.spotify.music`      (Spotify)
  * - `com.android.chrome`     (Chrome)
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class LaunchAppSkillTest {
 
     // -----------------------------------------------------------------------
@@ -237,7 +242,7 @@ class LaunchAppSkillTest {
     private inline fun <reified T : Throwable> assertCauseIsInstanceOf(failure: SkillResult.Failure) {
         assertTrue(
             "Expected cause to be ${T::class.simpleName} but was ${failure.cause?.javaClass?.simpleName}",
-            failure.cause is T
+            failure.cause is T,
         )
     }
 }
