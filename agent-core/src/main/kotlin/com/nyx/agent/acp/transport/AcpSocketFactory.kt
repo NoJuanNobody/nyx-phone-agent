@@ -112,13 +112,17 @@ object AcpSocketFactory {
     /**
      * Resolve an abstract namespace socket.
      *
-     * The address is created with a leading '\0' byte to indicate abstract
-     * namespace on Linux.
+     * Linux abstract sockets are identified by a leading NUL byte, conventionally
+     * written with an '@' prefix (e.g. `@nyx_acp_socket`). The JDK's
+     * [UnixDomainSocketAddress] is backed by a [Path], which rejects a literal NUL
+     * (`InvalidPathException`), so the '@'-prefixed textual form is used here.
+     * Binding a true Linux abstract socket would require a native/JNI layer; this
+     * is the address representation used until that exists.
      */
     private fun resolveAbstract(): AcpSocketAddress.AbstractNamespace {
         return AcpSocketAddress.AbstractNamespace(
             name = DEFAULT_ABSTRACT_NAME,
-            address = UnixDomainSocketAddress.of("\u0000$DEFAULT_ABSTRACT_NAME")
+            address = UnixDomainSocketAddress.of("@$DEFAULT_ABSTRACT_NAME")
         )
     }
 }

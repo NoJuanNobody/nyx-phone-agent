@@ -6,7 +6,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -113,8 +113,8 @@ object AcpSchema {
             )
         }
 
-        // timestamp: integer > 0
-        val timestamp = obj[TIMESTAMP]!!.jsonPrimitive.intOrNull
+        // timestamp: integer > 0 (epoch millis — a Long, so values exceed Int.MAX)
+        val timestamp = obj[TIMESTAMP]!!.jsonPrimitive.longOrNull
             ?: return ValidationResult.Invalid(
                 ErrorResponse(ErrorCode.BAD_REQUEST.code, "timestamp must be an integer")
             )

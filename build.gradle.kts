@@ -17,6 +17,7 @@ allprojects {
 
 subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
+    apply(plugin = "org.jetbrains.kotlin.plugin.serialization")
     apply(plugin = "java")
 
     dependencies {

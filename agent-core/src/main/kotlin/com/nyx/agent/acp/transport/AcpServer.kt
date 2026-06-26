@@ -102,6 +102,11 @@ class AcpServer(
     private val messageHandler: suspend (ACPMessage) -> JsonElement,
     private val config: AcpServerConfig = AcpServerConfig()
 ) {
+    private companion object {
+        /** Listen backlog for the server socket; sized above the 100-client AC3 burst. */
+        const val ACCEPT_BACKLOG = 128
+    }
+
     private val logger = LoggerFactory.getLogger("AcpServer")
     private val json = Json {
         ignoreUnknownKeys = true
@@ -143,12 +148,14 @@ class AcpServer(
             is AcpSocketAddress.FileSystem -> {
                 serverSocket = ServerSocketChannel.open(java.net.StandardProtocolFamily.UNIX)
                 serverSocket!!.configureBlocking(true)
-                serverSocket!!.bind(address.address)
+                // Backlog sized above the AC3 burst target (100 concurrent clients);
+                // the default (~50) lets the listen queue overflow and drop connections.
+                serverSocket!!.bind(address.address, ACCEPT_BACKLOG)
             }
             is AcpSocketAddress.AbstractNamespace -> {
                 serverSocket = ServerSocketChannel.open(java.net.StandardProtocolFamily.UNIX)
                 serverSocket!!.configureBlocking(true)
-                serverSocket!!.bind(address.address)
+                serverSocket!!.bind(address.address, ACCEPT_BACKLOG)
             }
         }
 
@@ -442,8 +449,8 @@ class AcpServer(
             }
         }
 
-        // Cancel all coroutines
-        serverScope?.cancelAndJoin()
+        // Cancel all coroutines (cancelAndJoin is a Job operation, not a CoroutineScope one)
+        serverScope?.coroutineContext?.get(Job)?.cancelAndJoin()
         serverScope = null
         serverSocket = null
         socketAddress = null
