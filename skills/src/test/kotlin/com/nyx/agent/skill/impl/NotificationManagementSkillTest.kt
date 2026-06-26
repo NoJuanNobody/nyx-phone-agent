@@ -5,10 +5,10 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Before
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 
 class NotificationManagementSkillTest {
 
@@ -32,7 +32,7 @@ class NotificationManagementSkillTest {
         ),
     )
 
-    @Before
+    @BeforeEach
     fun setUp() {
         bridge = mockk()
         skill = NotificationManagementSkill(bridge)
@@ -58,7 +58,7 @@ class NotificationManagementSkillTest {
         assertEquals("Test Title", first["title"])
         assertEquals(listOf("Reply", "Mark as read"), first["actions"])
         // text body must NOT be present
-        assertTrue("notification map must not expose text body", !first.containsKey("text"))
+        assertTrue(!first.containsKey("text"), "notification map must not expose text body")
     }
 
     @Test

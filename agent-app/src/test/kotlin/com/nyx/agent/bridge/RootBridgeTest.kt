@@ -1,41 +1,24 @@
 package com.nyx.agent.bridge
 
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
-import org.junit.Test
-import org.mockito.MockedStatic
-import org.mockito.Mockito.mock
-import org.mockito.Mockito.mockStatic
-import org.mockito.Mockito.`when`
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Test
 
+/**
+ * The original test used Mockito (`mockStatic`, mocking a final class) which is not a
+ * dependency of this project and never compiled. Rewritten against the project's JUnit 5
+ * stack to assert RootBridge's real behavior on a standard non-rooted JVM/CI environment,
+ * where `su` is unavailable so `Runtime.exec` throws and is caught.
+ */
 class RootBridgeTest {
 
     @Test
-    fun `isRooted returns false when su is not available`() {
-        // On a standard JVM test environment, `su` is not available.
-        // RootBridge catches the exception and returns false.
-        val bridge = RootBridge()
-        assertFalse(bridge.isRooted())
+    fun `isRooted is false when su is unavailable`() {
+        assertFalse(RootBridge().isRooted())
     }
 
     @Test
-    fun `exec returns null when isRooted is false`() {
-        val bridge = object : RootBridge() {
-            override fun isRooted(): Boolean = false
-        }
-        assertNull(bridge.exec("id"))
-    }
-
-    @Test
-    fun `isRooted returns false when Runtime exec throws`() {
-        // Simulates a device where su is not on PATH and throws IOException
-        mockStatic(Runtime::class.java).use { mockedRuntime ->
-            val runtime = mock(Runtime::class.java)
-            mockedRuntime.`when`<Runtime> { Runtime.getRuntime() }.thenReturn(runtime)
-            `when`(runtime.exec(arrayOf("su", "-c", "id"))).thenThrow(RuntimeException("su not found"))
-
-            val bridge = RootBridge()
-            assertFalse(bridge.isRooted())
-        }
+    fun `exec returns null when not rooted`() {
+        assertNull(RootBridge().exec("id"))
     }
 }

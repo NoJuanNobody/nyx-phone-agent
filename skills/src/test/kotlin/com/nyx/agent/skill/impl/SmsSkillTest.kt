@@ -5,18 +5,18 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
-import org.junit.Before
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 
 class SmsSkillTest {
 
     private lateinit var bridge: SmsBridge
     private lateinit var skill: SmsSkill
 
-    @Before
+    @BeforeEach
     fun setUp() {
         bridge = mockk()
         skill = SmsSkill(bridge)
