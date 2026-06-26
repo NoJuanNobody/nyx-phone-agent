@@ -1,14 +1,16 @@
-# Swarm worktrees — never stage these as embedded repos
-.claude/worktrees/
-
-# Dependencies / build
-node_modules/
-dist/
+# Gradle
+.gradle/
 build/
-out/
-*.log
+!gradle/wrapper/gradle-wrapper.jar
 
-# OS / editor
-.DS_Store
+# IDE
 .idea/
+*.iml
 .vscode/
+
+# Worktrees
+.claude/worktrees/
+swarm-notes/
+
+# OS
+.DS_Store

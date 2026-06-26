@@ -1,16 +1,7 @@
-plugins {
-    alias(libs.plugins.kotlin.jvm)
-}
-
-kotlin {
-    jvmToolchain(17)
-}
-
 dependencies {
-    implementation(libs.kotlin.stdlib)
-    implementation(libs.kotlinx.coroutines.core)
-
-    testImplementation(libs.junit)
-    testImplementation(libs.mockk)
-    testImplementation(libs.kotlinx.coroutines.test)
+    // agent-core uses only JDK NIO (java.net.UnixDomainSocketAddress + AsynchronousChannel),
+    // kotlinx-coroutines/serialization (from the root build), and slf4j (via logback).
+    // The previous ktor-* deps were never imported and referenced a non-existent artifact
+    // (io.ktor:ktor-server-unixsocket), which broke the build and CI.
+    implementation(libs.logback.classic)
 }
