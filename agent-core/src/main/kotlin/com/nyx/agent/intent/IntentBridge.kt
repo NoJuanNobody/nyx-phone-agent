@@ -2,6 +2,7 @@ package com.nyx.agent.intent
 
 import com.nyx.agent.mcp.McpRegistry
 import com.nyx.agent.mcp.ToolCall
+import kotlinx.serialization.json.put
 
 /**
  * The Intent Bridge — the translator between raw LLM output and structured

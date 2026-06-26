@@ -442,8 +442,8 @@ class AcpServer(
             }
         }
 
-        // Cancel all coroutines
-        serverScope?.cancelAndJoin()
+        // Cancel all coroutines (cancelAndJoin is a Job operation, not a CoroutineScope one)
+        serverScope?.coroutineContext?.get(Job)?.cancelAndJoin()
         serverScope = null
         serverSocket = null
         socketAddress = null
