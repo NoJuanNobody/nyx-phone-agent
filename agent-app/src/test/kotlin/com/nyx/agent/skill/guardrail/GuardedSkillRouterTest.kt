@@ -8,17 +8,17 @@ import com.nyx.agent.skill.SkillResult
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Before
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 
 class GuardedSkillRouterTest {
 
     private lateinit var registry: SkillRegistry
     private lateinit var context: Context
 
-    @Before
+    @BeforeEach
     fun setUp() {
         registry = SkillRegistry()
         context = mockk()
@@ -135,7 +135,7 @@ class GuardedSkillRouterTest {
         val result = router.dispatch("both_guards", emptyMap())
 
         // Must be PermissionDenied, NOT ConfirmationDenied
-        assertTrue("Expected PermissionDenied but got $result", result is SkillResult.PermissionDenied)
+        assertTrue(result is SkillResult.PermissionDenied, "Expected PermissionDenied but got $result")
         val denied = result as SkillResult.PermissionDenied
         assertEquals("both_guards", denied.skillName)
     }

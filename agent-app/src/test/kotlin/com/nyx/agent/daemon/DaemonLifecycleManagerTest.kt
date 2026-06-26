@@ -20,19 +20,25 @@ import io.mockk.mockkStatic
 import io.mockk.slot
 import io.mockk.unmockkAll
 import io.mockk.verify
-import junit.framework.TestCase.assertEquals
-import junit.framework.TestCase.assertFalse
-import junit.framework.TestCase.assertTrue
 import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /**
  * Unit tests for [DaemonLifecycleManager].
  *
- * All Android framework calls are mocked with MockK so these tests run on
- * the JVM without an emulator or device.
+ * Android framework calls are mocked with MockK; Robolectric provides the real
+ * Intent/Uri/ComponentName value-object behavior these assertions inspect, so the
+ * tests run on the JVM without an emulator or device.
  */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class DaemonLifecycleManagerTest {
 
     @MockK
@@ -67,8 +73,8 @@ class DaemonLifecycleManagerTest {
         // real value being >= 26 in any modern test environment, but we verify the
         // intent action instead of the dispatch method to stay SDK-version agnostic).
         val intentSlot = slot<Intent>()
-        every { context.startForegroundService(capture(intentSlot)) } just Runs
-        every { context.startService(any()) } just Runs
+        every { context.startForegroundService(capture(intentSlot)) } returns null
+        every { context.startService(any()) } returns null
 
         DaemonLifecycleManager.start(context)
 
@@ -88,8 +94,8 @@ class DaemonLifecycleManagerTest {
     @Test
     fun `start intent targets NyxAgentDaemon class`() {
         val intentSlot = slot<Intent>()
-        every { context.startForegroundService(capture(intentSlot)) } just Runs
-        every { context.startService(capture(intentSlot)) } just Runs
+        every { context.startForegroundService(capture(intentSlot)) } returns null
+        every { context.startService(capture(intentSlot)) } returns null
 
         DaemonLifecycleManager.start(context)
 
@@ -124,8 +130,8 @@ class DaemonLifecycleManagerTest {
     @Test
     fun `restart calls stop then start`() {
         every { context.stopService(any()) } returns true
-        every { context.startForegroundService(any()) } just Runs
-        every { context.startService(any()) } just Runs
+        every { context.startForegroundService(any()) } returns null
+        every { context.startService(any()) } returns null
 
         DaemonLifecycleManager.restart(context)
 

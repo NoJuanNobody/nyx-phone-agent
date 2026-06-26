@@ -20,14 +20,14 @@
 
         <!-- NyxAgentDaemon: persistent foreground service hosting the agent runtime -->
         <service
-            android:name=".daemon.NyxAgentDaemon"
+            android:name="com.nyx.agent.daemon.NyxAgentDaemon"
             android:exported="false"
             android:foregroundServiceType="connectedDevice"
             android:stopWithTask="false" />
 
         <!-- Boot receiver to restart the daemon after device reboot -->
         <receiver
-            android:name=".daemon.BootReceiver"
+            android:name="com.nyx.agent.daemon.BootReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

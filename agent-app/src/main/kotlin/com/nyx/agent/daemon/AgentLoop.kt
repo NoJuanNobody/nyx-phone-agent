@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.nyx.agent.skill.SkillRegistry
 import com.nyx.agent.skill.SkillResult
+import com.nyx.agent.skill.SkillRouter
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.catch
 
@@ -28,8 +29,20 @@ class AgentLoop(
     private val context: Context,
     private val registry: SkillRegistry,
     private val scope: CoroutineScope,
+    /**
+     * Resolves the skill name to invoke for a notification from [packageName],
+     * or null to ignore it. Defaults to ignoring all notifications; a real
+     * package→skill mapping is configured by the host at construction time.
+     */
+    private val notificationSkillResolver: (packageName: String) -> String? = { null },
 ) {
+    private val router = SkillRouter(registry)
     private var loopJob: Job? = null
+
+    companion object {
+        /** SharedPreferences key persisted across restarts (see [LoopStateStore]). */
+        const val KEY_WAS_RUNNING = "was_running"
+    }
 
     /**
      * Start the agent loop. No-op if already running.
@@ -105,9 +118,9 @@ class AgentLoop(
         try {
             when (trigger) {
                 is Trigger.NotificationReceived -> {
-                    val skillName = registry.skillForNotification(trigger.packageName)
+                    val skillName = notificationSkillResolver(trigger.packageName)
                     if (skillName != null) {
-                        val result = registry.execute(skillName, mapOf(
+                        val result = router.dispatch(skillName, mapOf(
                             "packageName" to trigger.packageName,
                             "title" to trigger.title,
                             "text" to trigger.text,
@@ -117,18 +130,14 @@ class AgentLoop(
                 }
 
                 is Trigger.TimeBased -> {
-                    val result = registry.execute(trigger.tag, emptyMap())
-                    logResult(trigger.tag, result)
+                    logResult(trigger.tag, router.dispatch(trigger.tag, emptyMap()))
                 }
 
                 is Trigger.ControlCommand -> {
                     when (trigger.command) {
                         "stop" -> stop()
                         "emergency_stop" -> emergencyStop()
-                        else -> {
-                            val result = registry.execute(trigger.command, trigger.args)
-                            logResult(trigger.command, result)
-                        }
+                        else -> logResult(trigger.command, router.dispatch(trigger.command, trigger.args))
                     }
                 }
             }
@@ -140,10 +149,13 @@ class AgentLoop(
     }
 
     private fun logResult(skill: String, result: SkillResult) {
-        if (result.success) {
-            Log.i(TAG, "Skill '$skill' succeeded: ${result.output}")
-        } else {
-            Log.w(TAG, "Skill '$skill' failed: ${result.error}")
+        when (result) {
+            is SkillResult.Success -> Log.i(TAG, "Skill '$skill' succeeded: ${result.output}")
+            is SkillResult.Failure -> Log.w(TAG, "Skill '$skill' failed: ${result.error}")
+            is SkillResult.SkillNotFound -> Log.w(TAG, "Skill '$skill' is not registered")
+            is SkillResult.ConfirmationDenied -> Log.w(TAG, "Skill '$skill' denied: confirmation required")
+            is SkillResult.PermissionDenied ->
+                Log.w(TAG, "Skill '$skill' denied: missing permissions ${result.missingPermissions}")
         }
     }
 }

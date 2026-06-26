@@ -3,16 +3,16 @@ package com.nyx.agent.daemon
 import android.content.Context
 import android.content.SharedPreferences
 import com.nyx.agent.skill.SkillRegistry
-import com.nyx.agent.skill.SkillResult
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.*
-import org.junit.After
-import org.junit.Assert.*
-import org.junit.Before
-import org.junit.Test
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 
 class AgentLoopTest {
 
@@ -23,7 +23,7 @@ class AgentLoopTest {
     private lateinit var testScope: TestScope
     private lateinit var loop: AgentLoop
 
-    @Before
+    @BeforeEach
     fun setUp() {
         editor = mockk(relaxed = true)
         every { editor.putBoolean(any(), any()) } returns editor
@@ -38,16 +38,13 @@ class AgentLoopTest {
             every { getSharedPreferences("agent_loop", Context.MODE_PRIVATE) } returns sharedPrefs
         }
 
-        registry = mockk(relaxed = true) {
-            every { skillForNotification(any()) } returns null
-            every { execute(any(), any()) } returns SkillResult(success = true, output = "ok")
-        }
+        registry = SkillRegistry()
 
         testScope = TestScope()
         loop = AgentLoop(context, registry, testScope)
     }
 
-    @After
+    @AfterEach
     fun tearDown() {
         testScope.cancel()
     }
@@ -58,9 +55,9 @@ class AgentLoopTest {
 
     @Test
     fun `start sets isRunning to true`() {
-        assertFalse("Should not be running before start", loop.isRunning)
+        assertFalse(loop.isRunning, "Should not be running before start")
         loop.start()
-        assertTrue("Should be running after start", loop.isRunning)
+        assertTrue(loop.isRunning, "Should be running after start")
     }
 
     @Test
@@ -84,7 +81,7 @@ class AgentLoopTest {
         loop.start()
         assertTrue(loop.isRunning)
         loop.stop()
-        assertFalse("Should not be running after stop", loop.isRunning)
+        assertFalse(loop.isRunning, "Should not be running after stop")
     }
 
     @Test
@@ -99,8 +96,8 @@ class AgentLoopTest {
         loop.start()
         assertTrue(loop.isRunning)
         loop.emergencyStop()
-        assertFalse("Should not be running after emergencyStop", loop.isRunning)
-        assertTrue("Scope should be cancelled", testScope.coroutineContext.job.isCancelled)
+        assertFalse(loop.isRunning, "Should not be running after emergencyStop")
+        assertTrue(testScope.coroutineContext.job.isCancelled, "Scope should be cancelled")
     }
 
     @Test
@@ -120,15 +117,18 @@ class AgentLoopTest {
         val job = launch {
             TriggerBus.events.collect { collected.add(it) }
         }
+        // TriggerBus is a replay-less SharedFlow, so wait for the collector to
+        // subscribe before emitting, otherwise the event is dropped.
+        delay(50)
         val trigger = Trigger.NotificationReceived("com.example", "Hello", "World")
         val emitted = TriggerBus.tryEmit(trigger)
-        assertTrue("tryEmit should succeed with buffer space", emitted)
+        assertTrue(emitted, "tryEmit should succeed with buffer space")
 
         // Give the collector a moment to receive the event
         delay(50)
         job.cancel()
 
-        assertTrue("Collector should have received the trigger", collected.contains(trigger))
+        assertTrue(collected.contains(trigger), "Collector should have received the trigger")
     }
 
     @Test
@@ -139,6 +139,8 @@ class AgentLoopTest {
         val job1 = launch { TriggerBus.events.collect { collected1.add(it) } }
         val job2 = launch { TriggerBus.events.collect { collected2.add(it) } }
 
+        // Wait for both collectors to subscribe before emitting (replay-less flow).
+        delay(50)
         val trigger = Trigger.TimeBased("scheduled-check")
         TriggerBus.tryEmit(trigger)
         delay(50)
@@ -162,7 +164,7 @@ class AgentLoopTest {
         val result = LoopStateStore.wasRunning(context)
 
         verify { editor.putBoolean("was_running", true) }
-        assertTrue("wasRunning should return true after setRunning(true)", result)
+        assertTrue(result, "wasRunning should return true after setRunning(true)")
     }
 
     @Test
@@ -173,7 +175,7 @@ class AgentLoopTest {
         val result = LoopStateStore.wasRunning(context)
 
         verify { editor.putBoolean("was_running", false) }
-        assertFalse("wasRunning should return false after setRunning(false)", result)
+        assertFalse(result, "wasRunning should return false after setRunning(false)")
     }
 
     @Test
@@ -181,7 +183,7 @@ class AgentLoopTest {
         every { sharedPrefs.getBoolean("was_running", false) } returns false
 
         val result = LoopStateStore.wasRunning(context)
-        assertFalse("Default state should be false", result)
+        assertFalse(result, "Default state should be false")
     }
 
     @Test
@@ -190,11 +192,4 @@ class AgentLoopTest {
 
         assertTrue(loop.wasRunningBeforeRestart())
     }
-
-    companion object {
-        // Expose for test verification
-    }
 }
-
-// Extension to expose KEY_WAS_RUNNING from AgentLoop companion in tests
-private val AgentLoop.Companion.KEY_WAS_RUNNING: String get() = "was_running"
