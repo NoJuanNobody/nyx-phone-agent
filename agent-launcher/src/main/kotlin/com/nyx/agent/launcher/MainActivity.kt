@@ -15,6 +15,7 @@ import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.ArrayAdapter
@@ -49,11 +50,10 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 
 /**
- * Chat screen for talking to Nyx. You type (or speak) a message; Nyx replies in natural
- * language and calls skills as tools when an action is wanted (see [ConversationalAgent]).
- * Replies are spoken aloud via [TextToSpeech]; the mic uses [SpeechRecognizer].
- *
- * API key + model are configured up top and persisted in SharedPreferences "nyx".
+ * Terminal-styled chat screen for talking to Nyx: green-on-black, monospace, prompt-style
+ * input. You type (or speak) a message; Nyx replies in natural language and calls skills as
+ * tools (see [ConversationalAgent]). Replies are spoken via [TextToSpeech]; the mic uses
+ * [SpeechRecognizer]. API key + model are configured up top and persisted in prefs "nyx".
  */
 class MainActivity : Activity() {
 
@@ -78,50 +78,53 @@ class MainActivity : Activity() {
     private var speakReplies = true
     private var recognizer: SpeechRecognizer? = null
 
+    // Terminal palette
+    private val cBg = Color.parseColor("#0A0F0A")
+    private val cFg = Color.parseColor("#2EE66B")      // phosphor green (assistant/output)
+    private val cUser = Color.parseColor("#CFFFD8")    // brighter green-white (user input)
+    private val cDim = Color.parseColor("#3C8F5E")     // dim green (chrome, hints)
+    private val cErr = Color.parseColor("#FFB300")     // amber (errors)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = getSharedPreferences("nyx", Context.MODE_PRIVATE)
+        window.statusBarColor = cBg
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)
-            setPadding(dp(14), dp(28), dp(14), dp(10))
+            setBackgroundColor(cBg)
+            setPadding(dp(12), dp(28), dp(12), dp(8))
         }
 
-        // ---- header + daemon status ----
-        root.addView(TextView(this).apply {
-            text = "Nyx"; textSize = 24f; setTypeface(typeface, Typeface.BOLD)
-        })
-        daemonStatus = TextView(this).apply { textSize = 11f; setTextColor(Color.GRAY) }
+        // ---- banner + status ----
+        root.addView(term("nyx://terminal", cFg, 18f, bold = true))
+        daemonStatus = term("", cDim, 11f)
         root.addView(daemonStatus)
 
         // ---- settings: key + model + controls ----
-        apiKeyField = EditText(this).apply {
-            layoutParams = fullWidth()
-            setText(prefs.getString("api_key", "").orEmpty())
-            hint = "OpenRouter API key (sk-or-...)"
-            textSize = 12f
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or
-                android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
-        }
+        apiKeyField = termField(
+            prefill = prefs.getString("api_key", "").orEmpty(),
+            hint = "openrouter api key (sk-or-...)",
+            password = true,
+        )
         root.addView(apiKeyField)
 
         val settingsRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        modelSpinner = Spinner(this).apply {
-            adapter = ArrayAdapter(
-                this@MainActivity, android.R.layout.simple_spinner_dropdown_item, OPENROUTER_MODELS
-            )
-            setSelection(OPENROUTER_MODELS.indexOf(prefs.getString("model", DEFAULT_MODEL)).coerceAtLeast(0))
-        }
+        modelSpinner = Spinner(this).apply { adapter = terminalSpinnerAdapter() }
+        modelSpinner.setSelection(OPENROUTER_MODELS.indexOf(prefs.getString("model", DEFAULT_MODEL)).coerceAtLeast(0))
         settingsRow.addView(modelSpinner, weight = 1f)
-        settingsRow.addView(button("Speak: on") { toggleSpeak(it as Button) }, weight = 0f)
-        settingsRow.addView(button("New") { newChat() }, weight = 0f)
+        settingsRow.addView(button("[tts:on]") { toggleSpeak(it as Button) }, weight = 0f)
+        settingsRow.addView(button("[new]") { newChat() }, weight = 0f)
         root.addView(settingsRow)
+
+        // separator
+        root.addView(term("────────────────────────────", cDim, 12f))
 
         // ---- conversation ----
         messagesView = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(8), 0, dp(8))
+            setPadding(0, dp(4), 0, dp(4))
         }
         conversation = ScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f)
@@ -129,19 +132,16 @@ class MainActivity : Activity() {
         }
         root.addView(conversation)
 
-        // ---- input row: text + mic + send ----
+        // ---- prompt input row: > [field] [mic] [run] ----
         val inputRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        inputField = EditText(this).apply {
-            hint = "Message Nyx… (e.g. open Chrome)"
-            textSize = 14f
-            maxLines = 3
-        }
+        inputRow.addView(term(">", cFg, 16f, bold = true).apply { setPadding(0, 0, dp(6), 0) }, weight = 0f)
+        inputField = termField(prefill = "", hint = "type a command…", password = false).apply { maxLines = 3 }
         inputRow.addView(inputField, weight = 1f)
-        inputRow.addView(button("🎤") { startVoiceInput() }, weight = 0f)
-        sendButton = button("Send") { onSend(inputField.text.toString()) }
+        inputRow.addView(button("[mic]") { startVoiceInput() }, weight = 0f)
+        sendButton = button("[run]") { onSend(inputField.text.toString()) }
         inputRow.addView(sendButton, weight = 0f)
         root.addView(inputRow)
 
@@ -157,7 +157,7 @@ class MainActivity : Activity() {
         ensureNotificationPermission()
         DaemonLifecycleManager.start(this)
         refreshDaemon()
-        addBubble("assistant", "Hi, I'm Nyx. Ask me to open an app, change a setting, or just chat.")
+        addBubble("system", "nyx agent online. type a command, ask a question, or build an app.")
 
         intent?.getStringExtra("nyx_cmd")?.let { onSend(it) }
     }
@@ -179,7 +179,7 @@ class MainActivity : Activity() {
         val message = text.trim()
         if (message.isEmpty()) return
         val apiKey = apiKeyField.text.toString().trim()
-        if (apiKey.isEmpty()) { addBubble("assistant", "Add your OpenRouter API key up top first."); return }
+        if (apiKey.isEmpty()) { addBubble("error", "no api key. paste your openrouter key above."); return }
 
         val model = (modelSpinner.selectedItem as? String) ?: DEFAULT_MODEL
         prefs.edit().putString("api_key", apiKey).putString("model", model).apply()
@@ -187,11 +187,11 @@ class MainActivity : Activity() {
         addBubble("user", message)
         inputField.setText("")
         sendButton.isEnabled = false
-        val thinking = addBubble("assistant", "…")
+        val thinking = addBubble("system", "…")
 
         ui.launch {
             val reply = runCatching { ensureAgent(apiKey, model).send(message) }
-                .getOrElse { e -> "Sorry, something went wrong: ${e.message}" }
+                .getOrElse { e -> "error: ${e.message}" }
             messagesView.removeView(thinking)
             addBubble("assistant", reply)
             speak(reply)
@@ -211,7 +211,7 @@ class MainActivity : Activity() {
     private fun newChat() {
         agent?.reset()
         messagesView.removeAllViews()
-        addBubble("assistant", "New chat. What can I do for you?")
+        addBubble("system", "— new session —")
     }
 
     private fun buildRegistry(context: Context): SkillRegistry = SkillRegistry().apply {
@@ -219,14 +219,12 @@ class MainActivity : Activity() {
         register(SystemControlsSkill(AndroidSystemControlsBridge(context)))
         register(SmsSkill(AndroidSmsBridge(context)))
         register(VoiceIOSkill(AndroidVoiceIOBridge(context)))
-        // Nyx can build & run mini-apps on the phone; code-gen runs through the selected LLM.
         register(BuildAppSkill(context) { spec -> generateAppHtml(spec) })
         register(OpenAppSkill(context))
         register(ListAppsSkill(context))
         register(PinAppSkill(context))
     }
 
-    /** Generates a complete self-contained HTML mini-app for [spec] using the selected model. */
     private suspend fun generateAppHtml(spec: String): String {
         val apiKey = apiKeyField.text.toString().trim()
         val model = (modelSpinner.selectedItem as? String) ?: DEFAULT_MODEL
@@ -239,14 +237,12 @@ class MainActivity : Activity() {
     // -------------------------------------------------------------------------
 
     private fun speak(text: String) {
-        if (speakReplies && ttsReady) {
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "nyx-reply")
-        }
+        if (speakReplies && ttsReady) tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "nyx-reply")
     }
 
     private fun toggleSpeak(btn: Button) {
         speakReplies = !speakReplies
-        btn.text = if (speakReplies) "Speak: on" else "Speak: off"
+        btn.text = if (speakReplies) "[tts:on]" else "[tts:off]"
         if (!speakReplies) tts?.stop()
     }
 
@@ -256,23 +252,20 @@ class MainActivity : Activity() {
             return
         }
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            toast("Speech recognition isn't available on this device.")
-            return
+            toast("speech recognition unavailable"); return
         }
         recognizer?.destroy()
         recognizer = SpeechRecognizer.createSpeechRecognizer(this).apply {
             setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) { inputField.hint = "Listening…" }
+                override fun onReadyForSpeech(params: Bundle?) { inputField.hint = "listening…" }
                 override fun onResults(results: Bundle?) {
-                    val text = results
-                        ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        ?.firstOrNull().orEmpty()
-                    inputField.hint = "Message Nyx…"
+                    val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
+                    inputField.hint = "type a command…"
                     if (text.isNotBlank()) onSend(text)
                 }
                 override fun onError(error: Int) {
-                    inputField.hint = "Message Nyx…"
-                    toast("Voice input error ($error).")
+                    inputField.hint = "type a command…"
+                    toast("voice error ($error)")
                 }
                 override fun onBeginningOfSpeech() {}
                 override fun onRmsChanged(rmsdB: Float) {}
@@ -293,32 +286,31 @@ class MainActivity : Activity() {
     // UI helpers
     // -------------------------------------------------------------------------
 
-    /** Adds a chat bubble and returns the view (so a placeholder can be replaced/removed). */
+    /** Adds a terminal line and returns it (so a placeholder can be replaced/removed). */
     private fun addBubble(role: String, text: String): View {
-        val isUser = role == "user"
-        val bubble = TextView(this).apply {
-            this.text = text
-            textSize = 14f
-            setPadding(dp(12), dp(8), dp(12), dp(8))
-            setTextColor(if (isUser) Color.WHITE else Color.parseColor("#101418"))
-            background = GradientDrawable().apply {
-                cornerRadius = dp(14).toFloat()
-                setColor(if (isUser) Color.parseColor("#3D5AFE") else Color.parseColor("#E8EAF0"))
-            }
+        val (prefix, color) = when (role) {
+            "user" -> "> " to cUser
+            "assistant" -> "" to cFg
+            "error" -> "! " to cErr
+            else -> "" to cDim   // system
         }
-        val lp = LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
-            topMargin = dp(4); bottomMargin = dp(4)
-            gravity = if (isUser) Gravity.END else Gravity.START
+        val line = TextView(this).apply {
+            typeface = Typeface.MONOSPACE
+            textSize = 13.5f
+            setTextColor(color)
+            setPadding(0, dp(3), 0, dp(3))
+            this.text = prefix + text
+            setTextIsSelectable(true)
         }
-        messagesView.addView(bubble, lp)
+        messagesView.addView(line, fullWidth())
         conversation.post { conversation.fullScroll(View.FOCUS_DOWN) }
-        return bubble
+        return line
     }
 
     private fun refreshDaemon() {
         val running = DaemonLifecycleManager.isRunning(this)
-        daemonStatus.text = if (running) "● daemon running" else "○ daemon stopped"
-        daemonStatus.setTextColor(if (running) Color.parseColor("#2E7D32") else Color.GRAY)
+        daemonStatus.text = if (running) "● daemon online" else "○ daemon offline"
+        daemonStatus.setTextColor(if (running) cDim else Color.parseColor("#7A4A2A"))
     }
 
     private fun ensureNotificationPermission() {
@@ -331,9 +323,66 @@ class MainActivity : Activity() {
 
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
 
+    /** A plain monospace line/label. */
+    private fun term(text: String, color: Int, size: Float, bold: Boolean = false) = TextView(this).apply {
+        this.text = text
+        setTextColor(color)
+        textSize = size
+        typeface = if (bold) Typeface.create(Typeface.MONOSPACE, Typeface.BOLD) else Typeface.MONOSPACE
+    }
+
+    /** A terminal-styled, underline-free input field. */
+    private fun termField(prefill: String, hint: String, password: Boolean) = EditText(this).apply {
+        layoutParams = fullWidth()
+        setText(prefill)
+        this.hint = hint
+        textSize = 13.5f
+        typeface = Typeface.MONOSPACE
+        setTextColor(cUser)
+        setHintTextColor(cDim)
+        background = null
+        setPadding(0, dp(6), 0, dp(6))
+        inputType = if (password) {
+            android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+        } else {
+            android.text.InputType.TYPE_CLASS_TEXT
+        }
+    }
+
+    /** A dark button with a thin green border and green monospace label. */
     private fun button(text: String, onClick: (View) -> Unit) = Button(this).apply {
         this.text = text
+        setTextColor(cFg)
+        typeface = Typeface.MONOSPACE
+        textSize = 12f
+        isAllCaps = false
+        stateListAnimator = null
+        setPadding(dp(8), dp(4), dp(8), dp(4))
+        minWidth = 0
+        minimumWidth = 0
+        background = GradientDrawable().apply {
+            setColor(cBg)
+            cornerRadius = dp(4).toFloat()
+            setStroke(dp(1), cDim)
+        }
         setOnClickListener { onClick(it) }
+    }
+
+    /** ArrayAdapter that renders the model list green-on-dark, monospace. */
+    private fun terminalSpinnerAdapter() = object : ArrayAdapter<String>(
+        this, android.R.layout.simple_spinner_item, OPENROUTER_MODELS
+    ) {
+        init { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
+            style(super.getView(position, convertView, parent) as TextView, dropdown = false)
+        override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View =
+            style(super.getDropDownView(position, convertView, parent) as TextView, dropdown = true)
+        private fun style(tv: TextView, dropdown: Boolean): TextView = tv.apply {
+            typeface = Typeface.MONOSPACE
+            textSize = 13f
+            setTextColor(cFg)
+            if (dropdown) setBackgroundColor(cBg)
+        }
     }
 
     private fun LinearLayout.addView(view: View, weight: Float) {
