@@ -26,8 +26,12 @@ import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import android.net.Uri
 import com.nyx.agent.agent.ConversationalAgent
+import com.nyx.agent.agent.ExternalTool
 import com.nyx.agent.daemon.DaemonLifecycleManager
+import com.nyx.agent.launcher.mcp.McpOAuth
+import com.nyx.agent.mcpclient.RemoteMcpClient
 import com.nyx.agent.launcher.apps.BuildAppSkill
 import com.nyx.agent.launcher.apps.ListAppsSkill
 import com.nyx.agent.launcher.apps.OpenAppSkill
@@ -47,7 +51,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import java.util.Locale
+import java.util.UUID
 
 /**
  * Terminal-styled chat screen for talking to Nyx: green-on-black, monospace, prompt-style
@@ -68,14 +76,18 @@ class MainActivity : Activity() {
     private lateinit var sendButton: Button
     private lateinit var daemonStatus: TextView
 
+    private lateinit var mcpUrlField: EditText
     private val registry by lazy { buildRegistry(applicationContext) }
     private var agent: ConversationalAgent? = null
     private var agentKey: String = ""
     private var agentModel: String = ""
+    private var mcpTools: List<ExternalTool> = emptyList()
+    private val oauth by lazy { McpOAuth(prefs) }
 
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     private var speakReplies = true
+    private var verbose = true   // show [tool] trace lines
     private var recognizer: SpeechRecognizer? = null
 
     // Terminal palette
@@ -84,6 +96,7 @@ class MainActivity : Activity() {
     private val cUser = Color.parseColor("#CFFFD8")    // brighter green-white (user input)
     private val cDim = Color.parseColor("#3C8F5E")     // dim green (chrome, hints)
     private val cErr = Color.parseColor("#FFB300")     // amber (errors)
+    private val cTool = Color.parseColor("#56B6C2")    // cyan (tool-call trace)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -110,13 +123,30 @@ class MainActivity : Activity() {
         )
         root.addView(apiKeyField)
 
-        val settingsRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        modelSpinner = Spinner(this).apply { adapter = terminalSpinnerAdapter() }
+        modelSpinner = Spinner(this).apply {
+            adapter = terminalSpinnerAdapter()
+            layoutParams = fullWidth()
+        }
         modelSpinner.setSelection(OPENROUTER_MODELS.indexOf(prefs.getString("model", DEFAULT_MODEL)).coerceAtLeast(0))
-        settingsRow.addView(modelSpinner, weight = 1f)
-        settingsRow.addView(button("[tts:on]") { toggleSpeak(it as Button) }, weight = 0f)
-        settingsRow.addView(button("[new]") { newChat() }, weight = 0f)
-        root.addView(settingsRow)
+        root.addView(modelSpinner)
+
+        val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        controls.addView(button("[tts:on]") { toggleSpeak(it as Button) }, weight = 0f)
+        controls.addView(button("[trace:on]") { toggleTrace(it as Button) }, weight = 0f)
+        controls.addView(button("[new]") { newChat() }, weight = 0f)
+        root.addView(controls)
+
+        // MCP server connection (OAuth login + tool discovery)
+        mcpUrlField = termField(
+            prefill = prefs.getString("mcp_url", DEFAULT_MCP_URL).orEmpty(),
+            hint = "mcp server url",
+            password = false,
+        )
+        root.addView(mcpUrlField)
+        val mcpRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        mcpRow.addView(button("[mcp:connect]") { connectMcp() }, weight = 0f)
+        mcpRow.addView(button("[mcp:logout]") { logoutMcp() }, weight = 0f)
+        root.addView(mcpRow)
 
         // separator
         root.addView(term("────────────────────────────", cDim, 12f))
@@ -162,7 +192,7 @@ class MainActivity : Activity() {
         intent?.getStringExtra("nyx_cmd")?.let { onSend(it) }
     }
 
-    override fun onResume() { super.onResume(); refreshDaemon() }
+    override fun onResume() { super.onResume(); refreshDaemon(); checkPendingOAuth() }
 
     override fun onDestroy() {
         ui.cancel()
@@ -201,11 +231,98 @@ class MainActivity : Activity() {
 
     private fun ensureAgent(apiKey: String, model: String): ConversationalAgent {
         if (agent == null || agentKey != apiKey || agentModel != model) {
-            agent = ConversationalAgent(OpenRouterChatClient(apiKey), model, registry)
+            agent = ConversationalAgent(OpenRouterChatClient(apiKey), model, registry, mcpTools) { name, args, result ->
+                onToolTrace(name, args, result)
+            }
             agentKey = apiKey
             agentModel = model
         }
         return agent!!
+    }
+
+    /** If logged in, connects to the MCP server; otherwise opens the browser sign-in. */
+    private fun connectMcp() {
+        prefs.edit().putString("mcp_url", mcpUrlField.text.toString().trim().ifEmpty { DEFAULT_MCP_URL }).apply()
+        if (oauth.isLoggedIn()) { connectMcpWithToken(); return }
+        ui.launch {
+            try {
+                addBubble("system", "[mcp] opening sign-in… complete it in the browser, then return to Nyx")
+                val clientId = oauth.ensureClientId()
+                val verifier = oauth.newPkceVerifier()
+                val authUrl = oauth.authorizeUrl(clientId, verifier, UUID.randomUUID().toString())
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(authUrl)))
+            } catch (e: Exception) {
+                addBubble("error", "[mcp] couldn't start sign-in: ${e.message}")
+            }
+        }
+    }
+
+    /** Completes the OAuth code exchange after the browser redirect (survives process death). */
+    private fun checkPendingOAuth() {
+        prefs.getString("oauth_error", null)?.let {
+            prefs.edit().remove("oauth_error").apply()
+            addBubble("error", "[mcp] login: $it")
+        }
+        val code = prefs.getString("oauth_pending_code", null) ?: return
+        prefs.edit().remove("oauth_pending_code").apply()
+        ui.launch {
+            try {
+                addBubble("system", "[mcp] completing sign-in…")
+                oauth.exchangeCode(code)
+                addBubble("system", "[mcp] signed in ✓")
+                connectMcpWithToken()
+            } catch (e: Exception) {
+                addBubble("error", "[mcp] token exchange failed: ${e.message}")
+            }
+        }
+    }
+
+    /** Discovers the MCP server's tools (with token refresh on failure) and adds them to the agent. */
+    private fun connectMcpWithToken() {
+        val url = mcpUrlField.text.toString().trim().ifEmpty { DEFAULT_MCP_URL }
+        ui.launch {
+            try {
+                addBubble("system", "[mcp] connecting…")
+                val tools = try {
+                    RemoteMcpClient(url, oauth.accessToken()).connect()
+                } catch (e: Exception) {
+                    if (oauth.refresh()) RemoteMcpClient(url, oauth.accessToken()).connect() else throw e
+                }
+                val live = RemoteMcpClient(url, oauth.accessToken())
+                mcpTools = tools.map { t ->
+                    ExternalTool(t.name, t.description, t.inputSchema) { argsJson ->
+                        live.callTool(t.name, parseJsonObj(argsJson))
+                    }
+                }
+                agent = null  // rebuild so the agent advertises the new tools
+                val names = tools.take(5).joinToString(", ") { it.name }
+                addBubble("system", "[mcp] connected: ${tools.size} tools — $names${if (tools.size > 5) ", …" else ""}")
+            } catch (e: Exception) {
+                addBubble("error", "[mcp] ${e.message}")
+            }
+        }
+    }
+
+    private fun logoutMcp() {
+        oauth.clearTokens()
+        mcpTools = emptyList()
+        agent = null
+        addBubble("system", "[mcp] logged out, tools removed")
+    }
+
+    private fun parseJsonObj(s: String): JsonObject =
+        runCatching { Json.parseToJsonElement(s).jsonObject }.getOrDefault(JsonObject(emptyMap()))
+
+    /** Renders a cyan [tool] line for each executed tool call (when verbose). */
+    private fun onToolTrace(name: String, argsJson: String, result: String) {
+        if (!verbose) return
+        val args = argsJson.replace(Regex("\\s+"), " ").trim().take(120)
+        runOnUiThread { addBubble("tool", "$name $args → ${result.take(160)}") }
+    }
+
+    private fun toggleTrace(btn: Button) {
+        verbose = !verbose
+        btn.text = if (verbose) "[trace:on]" else "[trace:off]"
     }
 
     private fun newChat() {
@@ -292,6 +409,7 @@ class MainActivity : Activity() {
             "user" -> "> " to cUser
             "assistant" -> "" to cFg
             "error" -> "! " to cErr
+            "tool" -> "[tool] " to cTool
             else -> "" to cDim   // system
         }
         val line = TextView(this).apply {
@@ -396,6 +514,7 @@ class MainActivity : Activity() {
 
     private companion object {
         const val DEFAULT_MODEL = "openai/gpt-4o-mini"
+        const val DEFAULT_MCP_URL = "https://mcp.higgsfield.ai/mcp"
 
         val CODE_SYSTEM_PROMPT = """
             You are an expert front-end engineer. You output a COMPLETE, self-contained, single-file

@@ -59,4 +59,5 @@ dependencies {
     implementation(project(":llm"))
     implementation(libs.kotlinx.coroutines.core)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation(libs.kotlinx.serialization.json)
 }

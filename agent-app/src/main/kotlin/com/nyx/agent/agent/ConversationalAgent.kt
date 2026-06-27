@@ -26,9 +26,14 @@ class ConversationalAgent(
     private val client: OpenRouterChatClient,
     private val model: String,
     private val registry: SkillRegistry,
+    /** Tools from outside the local registry (e.g. remote MCP servers). */
+    private val externalTools: List<ExternalTool> = emptyList(),
+    /** Invoked after each tool runs, with its name, raw JSON args, and result string. */
+    private val onTool: (name: String, argsJson: String, result: String) -> Unit = { _, _, _ -> },
 ) {
     private val json = Json { ignoreUnknownKeys = true }
     private val history = mutableListOf(ChatMessage("system", SYSTEM_PROMPT))
+    private val externalByName = externalTools.associateBy { it.name }
 
     /** Send a user message; returns Nyx's natural-language reply (after running any tools). */
     suspend fun send(userMessage: String): String {
@@ -44,7 +49,10 @@ class ConversationalAgent(
             // Assistant decided to call tools — record that turn, run them, feed results back.
             history.add(ChatMessage("assistant", result.content, toolCalls = result.toolCalls))
             for (call in result.toolCalls) {
-                history.add(ChatMessage("tool", runSkill(call), toolCallId = call.id, name = call.name))
+                val outcome = runSkill(call)
+                android.util.Log.i("NyxAgent", "tool ${call.name} ${call.argumentsJson} -> $outcome")
+                onTool(call.name, call.argumentsJson, outcome)
+                history.add(ChatMessage("tool", outcome, toolCallId = call.id, name = call.name))
             }
         }
         val giveUp = "Sorry — I couldn't complete that in a reasonable number of steps."
@@ -59,14 +67,19 @@ class ConversationalAgent(
     }
 
     private suspend fun runSkill(call: ToolCall): String {
-        val skill = registry.find(call.name) ?: return "error: no such skill '${call.name}'"
-        return when (val r = skill.execute(parseArgs(call.argumentsJson))) {
-            is SkillResult.Success -> if (r.output.isEmpty()) "ok" else "ok: ${r.output}"
-            is SkillResult.Failure -> "failed: ${r.error}"
-            is SkillResult.SkillNotFound -> "error: skill not found"
-            is SkillResult.ConfirmationDenied -> "blocked: needs confirmation"
-            is SkillResult.PermissionDenied -> "blocked: missing permissions ${r.missingPermissions}"
+        registry.find(call.name)?.let { skill ->
+            return when (val r = skill.execute(parseArgs(call.argumentsJson))) {
+                is SkillResult.Success -> if (r.output.isEmpty()) "ok" else "ok: ${r.output}"
+                is SkillResult.Failure -> "failed: ${r.error}"
+                is SkillResult.SkillNotFound -> "error: skill not found"
+                is SkillResult.ConfirmationDenied -> "blocked: needs confirmation"
+                is SkillResult.PermissionDenied -> "blocked: missing permissions ${r.missingPermissions}"
+            }
         }
+        externalByName[call.name]?.let { tool ->
+            return runCatching { tool.invoke(call.argumentsJson) }.getOrElse { "failed: ${it.message}" }
+        }
+        return "error: no such tool '${call.name}'"
     }
 
     private fun parseArgs(argsJson: String): Map<String, Any> {
@@ -78,9 +91,13 @@ class ConversationalAgent(
         }
     }
 
-    private fun toolSpecs(): List<ToolSpec> = registry.all().sortedBy { it.name }.map { skill ->
-        val schema = TOOL_SCHEMAS[skill.name] ?: PERMISSIVE_SCHEMA
-        ToolSpec(skill.name, skill.description, json.parseToJsonElement(schema).jsonObject)
+    private fun toolSpecs(): List<ToolSpec> {
+        val skillSpecs = registry.all().sortedBy { it.name }.map { skill ->
+            val schema = TOOL_SCHEMAS[skill.name] ?: PERMISSIVE_SCHEMA
+            ToolSpec(skill.name, skill.description, json.parseToJsonElement(schema).jsonObject)
+        }
+        val extSpecs = externalTools.map { ToolSpec(it.name, it.description, it.parameters) }
+        return skillSpecs + extSpecs
     }
 
     private companion object {
