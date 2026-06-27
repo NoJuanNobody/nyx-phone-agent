@@ -3,4 +3,5 @@
     <string name="app_name">Nyx Agent</string>
     <string name="daemon_notification_title">Nyx Agent is running</string>
     <string name="daemon_notification_text">Monitoring for tasks in the background</string>
+    <string name="accessibility_service_description">Lets Nyx observe on-screen content and perform tap, scroll, and swipe actions on your behalf.</string>
 </resources>

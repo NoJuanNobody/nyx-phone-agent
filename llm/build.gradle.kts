@@ -9,20 +9,6 @@ android {
 
     defaultConfig {
         minSdk = 26
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        externalNativeBuild {
-            cmake {
-                cppFlags("-std=c++17")
-            }
-        }
-    }
-
-    externalNativeBuild {
-        cmake {
-            path = file("CMakeLists.txt")
-            version = "3.22.1"
-        }
     }
 
     compileOptions {
@@ -32,13 +18,26 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+        }
+    }
 }
 
+// NOTE: the native llama.cpp build (externalNativeBuild + CMakeLists.txt) is intentionally
+// omitted here — LlamaCppBackend compiles fine (its `external` fns and System.loadLibrary
+// only bind at runtime) and we never instantiate it. The active backend is
+// OpenRouterLlmBackend (cloud, OpenAI-compatible) per the LLM-backend decision; on-device
+// engines come later behind the same LlmInferenceEngine interface.
+
 dependencies {
-    implementation(libs.kotlin.stdlib)
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.coroutines.android)
-    testImplementation(libs.junit)
+    implementation(libs.kotlinx.serialization.json)
+
+    testImplementation("junit:junit:4.13.2")
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
+    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.11.3")
 }
