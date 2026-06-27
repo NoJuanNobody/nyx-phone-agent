@@ -35,6 +35,7 @@ kotlin {
 
 dependencies {
     implementation(project(":agent-core"))
+    implementation(project(":llm"))
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
     implementation("androidx.core:core-ktx:1.13.1")
