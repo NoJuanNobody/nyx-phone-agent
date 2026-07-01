@@ -1,7 +1,14 @@
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.kotlin.serialization) apply false
+    alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.kotlin.android) apply false
 }
+
+// Modules that target Android (apply the Android Gradle Plugin in their own
+// build.gradle.kts). They are excluded from the pure-JVM configuration below.
+val androidModules = setOf("agent-app", "agent-launcher", "skills", "llm")
 
 allprojects {
     group = "com.nyx"
@@ -16,6 +23,9 @@ allprojects {
 }
 
 subprojects {
+    // Android modules configure themselves via the Android Gradle Plugin.
+    if (name in androidModules) return@subprojects
+
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "org.jetbrains.kotlin.plugin.serialization")
     apply(plugin = "java")
